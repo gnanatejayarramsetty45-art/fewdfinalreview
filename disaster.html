@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SafeHaven - Disaster Management</title>
+
+<!-- React -->
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<!-- CSS -->
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
+body{background:#f1f5f9;color:#1e293b}
+button{cursor:pointer;border:0;border-radius:7px;padding:10px 15px;background:#0f766e;color:white}
+input,select,textarea{width:100%;padding:11px;margin:8px 0 15px;border:1px solid #cbd5e1;border-radius:6px}
+h2{margin-bottom:18px}
+h3{margin-bottom:10px}
+.auth{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(120deg,#064e3b,#0f766e);padding:20px}
+.auth-box{background:white;padding:30px;border-radius:12px;width:100%;max-width:400px}
+.auth-box h1{text-align:center;color:#0f766e;margin-bottom:10px}
+.auth-box p{text-align:center;margin-bottom:20px;color:#64748b}
+.auth-box button{width:100%;margin-top:8px}
+.link{color:#0f766e;cursor:pointer;text-align:center;margin-top:15px}
+.layout{display:flex;min-height:100vh}
+.sidebar{width:240px;background:#0f172a;color:white;padding:22px;flex-shrink:0}
+.sidebar h2{color:#5eead4;margin-bottom:25px}
+.sidebar button{display:block;width:100%;text-align:left;background:transparent;margin:5px 0;padding:12px}
+.sidebar button:hover,.sidebar button.active{background:#115e59}
+.main{flex:1;min-width:0}
+.topbar{background:white;padding:18px 25px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.content{padding:25px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px;margin:20px 0}
+.card{background:white;padding:20px;border-radius:10px;box-shadow:0 2px 8px #0000000c}
+.card h2{font-size:28px;color:#0f766e;margin:10px 0}
+.panel{background:white;padding:20px;border-radius:10px;margin:18px 0;overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:500px}
+th,td{text-align:left;padding:12px;border-bottom:1px solid #e2e8f0}
+th{background:#f8fafc}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:15px}
+.small-btn{padding:7px 11px;margin:3px}
+.danger{background:#dc2626}
+.green{background:#15803d}
+.map{height:300px;background:linear-gradient(135deg,#d1fae5,#bae6fd);border-radius:10px;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px}
+.badge{background:#fee2e2;color:#991b1b;padding:5px 9px;border-radius:15px;font-size:12px}
+.tip{padding:15px;background:#f0fdfa;border-left:4px solid #0f766e;margin:10px 0;border-radius:5px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:750px){
+.layout{display:block}
+.sidebar{width:100%;padding:12px}
+.sidebar h2{margin:5px 0 10px}
+.sidebar nav{display:flex;overflow-x:auto;gap:5px}
+.sidebar button{width:auto;white-space:nowrap;margin:0}
+.content{padding:15px}
+.topbar{padding:15px;flex-wrap:wrap}
+.form-row{grid-template-columns:1fr}
+}
+</style>
+</head>
+
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const {useState}=React;
+
+function App(){
+ const [user,setUser]=useState(sessionStorage.getItem("safeUser")||"");
+ const [page,setPage]=useState("Dashboard");
+ const [mode,setMode]=useState("login");
+ const [name,setName]=useState("");
+ const [email,setEmail]=useState("");
+ const [password,setPassword]=useState("");
+ const [incidents,setIncidents]=useState(JSON.parse(localStorage.getItem("incidents")||"[]"));
+ const [volunteers,setVolunteers]=useState(JSON.parse(localStorage.getItem("volunteers")||"[]"));
+
+ const shelters=[
+  {name:"Community Relief Centre",location:"Guntur",beds:120},
+  {name:"Government School Shelter",location:"Vijayawada",beds:85},
+  {name:"City Emergency Camp",location:"Tenali",beds:60}
+ ];
+
+ const resources=[
+  {name:"Drinking Water",quantity:"500 bottles",type:"Essential"},
+  {name:"Food Packets",quantity:"300 packets",type:"Food"},
+  {name:"First Aid Kits",quantity:"100 kits",type:"Medical"},
+  {name:"Blankets",quantity:"200 pieces",type:"Clothing"}
+ ];
+
+ function authenticate(e){
+  e.preventDefault();
+  let users=JSON.parse(localStorage.getItem("safeUsers")||"[]");
+
+  if(mode==="register"){
+   if(users.some(u=>u.email===email)){
+    alert("Email already registered. Please login.");
+    return;
+   }
+   users.push({name,email,password});
+   localStorage.setItem("safeUsers",JSON.stringify(users));
+   alert("Registration successful! Please login.");
+   setMode("login");
+   setPassword("");
+  }else{
+   let found=users.find(u=>u.email===email&&u.password===password);
+   if(!found){alert("Invalid email or password. Please register first.");return}
+   setUser(found.name);
+   sessionStorage.setItem("safeUser",found.name);
+  }
+ }
+
+ function logout(){
+  sessionStorage.removeItem("safeUser");
+  setUser("");
+  setPage("Dashboard");
+ }
+
+ function addIncident(e){
+  e.preventDefault();
+  let f=e.target;
+  let item={
+   id:Date.now(),
+   type:f.type.value,
+   location:f.location.value,
+   severity:f.severity.value,
+   description:f.description.value,
+   status:"Reported"
+  };
+  let updated=[item,...incidents];
+  setIncidents(updated);
+  localStorage.setItem("incidents",JSON.stringify(updated));
+  f.reset();
+  alert("Incident reported successfully!");
+ }
+
+ function addVolunteer(e){
+  e.preventDefault();
+  let f=e.target;
+  let updated=[...volunteers,{name:f.name.value,phone:f.phone.value,skill:f.skill.value}];
+  setVolunteers(updated);
+  localStorage.setItem("volunteers",JSON.stringify(updated));
+  f.reset();
+  alert("Volunteer registration successful!");
+ }
+
+ if(!user){
+  return <div className="auth">
+   <div className="auth-box">
+    <h1>🛡 SafeHaven</h1>
+    <p>Disaster Management & Emergency Support</p>
+    <h2>{mode==="login"?"Login":"Create Account"}</h2>
+    <form onSubmit={authenticate}>
+     {mode==="register"&&<>
+      <label>Full Name</label>
+      <input required value={name} onChange={e=>setName(e.target.value)} placeholder="Enter your name"/>
+     </>}
+     <label>Email Address</label>
+     <input required type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Enter email"/>
+     <label>Password</label>
+     <input required type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Enter password" minLength="4"/>
+     <button type="submit">{mode==="login"?"Login":"Register"}</button>
+    </form>
+    <div className="link" onClick={()=>setMode(mode==="login"?"register":"login")}>
+     {mode==="login"?"New user? Register here":"Already registered? Login"}
+    </div>
+   </div>
+  </div>
+ }
+
+ const menu=["Dashboard","Incident Reports","Emergency Map","Shelters & Camps","Relief Resources","Volunteers","Safety Guidelines","Emergency Contacts","Settings"];
+
+ function dashboard(){
+  return <>
+   <h2>Disaster Management Dashboard</h2>
+   <p>Welcome back, {user}! Stay informed and stay safe.</p>
+   <div className="cards">
+    <div className="card"><h3>Total Incidents</h3><h2>{incidents.length}</h2><p>Reported incidents</p></div>
+    <div className="card"><h3>Active Shelters</h3><h2>{shelters.length}</h2><p>Available centres listed</p></div>
+    <div className="card"><h3>Volunteers</h3><h2>{volunteers.length}</h2><p>Registered volunteers</p></div>
+    <div className="card"><h3>Relief Resources</h3><h2>{resources.length}</h2><p>Resource categories</p></div>
+   </div>
+   <div className="panel">
+    <h3>Emergency Alert</h3>
+    <p>Be prepared. Follow official instructions during emergencies and contact emergency services when necessary.</p>
+   </div>
+   <div className="panel">
+    <h3>Quick Actions</h3>
+    <button onClick={()=>setPage("Incident Reports")}>Report Incident</button>{" "}
+    <button onClick={()=>setPage("Shelters & Camps")}>Find Shelter</button>{" "}
+    <button onClick={()=>setPage("Safety Guidelines")}>Safety Tips</button>
+   </div>
+   <div className="panel">
+    <h3>Recent Incident Reports</h3>
+    {incidents.length===0?<p>No incidents reported yet.</p>:incidents.slice(0,4).map(i=><p key={i.id}>⚠ {i.type} - {i.location} ({i.severity})</p>)}
+   </div>
+  </>;
+ }
+
+ function incidentPage(){
+  return <>
+   <h2>Incident Reports</h2>
+   <div className="panel">
+    <h3>Report a New Incident</h3>
+    <form onSubmit={addIncident}>
+     <label>Disaster Type</label>
+     <select name="type" required>
+      <option value="">Select type</option>
+      <option>Flood</option><option>Earthquake</option><option>Cyclone</option><option>Fire</option><option>Landslide</option><option>Other</option>
+     </select>
+     <label>Location</label>
+     <input name="location" required placeholder="Enter affected location"/>
+     <label>Severity</label>
+     <select name="severity"><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select>
+     <label>Description</label>
+     <textarea name="description" required placeholder="Describe the incident"></textarea>
+     <button type="submit">Submit Report</button>
+    </form>
+   </div>
+   <div className="panel">
+    <h3>Reported Incidents</h3>
+    {incidents.length===0?<p>No reports available.</p>:<table>
+     <thead><tr><th>Type</th><th>Location</th><th>Severity</th><th>Status</th></tr></thead>
+     <tbody>{incidents.map(i=><tr key={i.id}><td>{i.type}</td><td>{i.location}</td><td>{i.severity}</td><td>{i.status}</td></tr>)}</tbody>
+    </table>}
+   </div>
+  </>;
+ }
+
+ function mapPage(){
+  return <>
+   <h2>Emergency Map</h2>
+   <div className="panel">
+    <div className="map">
+     <div><h2>📍 Emergency Area Overview</h2><p>This is an illustrative map placeholder.</p><p>Use verified local maps and official alerts for real emergency navigation.</p></div>
+    </div>
+   </div>
+   <div className="panel"><h3>Important Locations</h3><p>🏥 Hospitals</p><p>🏫 Relief shelters</p><p>🚒 Fire stations</p><p>🚓 Police stations</p></div>
+  </>;
+ }
+
+ function shelterPage(){
+  return <>
+   <h2>Shelters & Relief Camps</h2>
+   <div className="grid">
+    {shelters.map(s=><div className="card" key={s.name}><h3>🏠 {s.name}</h3><p>📍 {s.location}</p><p>Listed capacity: {s.beds} people</p><span className="badge">Sample information</span></div>)}
+   </div>
+  </>;
+ }
+
+ function resourcePage(){
+  return <>
+   <h2>Relief Resources</h2>
+   <div className="grid">
+    {resources.map(r=><div className="card" key={r.name}><h3>📦 {r.name}</h3><h2>{r.quantity}</h2><p>{r.type}</p></div>)}
+   </div>
+  </>;
+ }
+
+ function volunteerPage(){
+  return <>
+   <h2>Volunteer Management</h2>
+   <div className="panel">
+    <h3>Register as a Volunteer</h3>
+    <form onSubmit={addVolunteer}>
+     <label>Full Name</label><input name="name" required placeholder="Enter name"/>
+     <label>Phone Number</label><input name="phone" required type="tel" placeholder="Enter phone number"/>
+     <label>Skills</label><select name="skill"><option>First Aid</option><option>Rescue Support</option><option>Food Distribution</option><option>Medical Support</option><option>Other</option></select>
+     <button>Register Volunteer</button>
+    </form>
+   </div>
+   <div className="panel"><h3>Registered Volunteers</h3>
+    {volunteers.length===0?<p>No volunteers registered yet.</p>:volunteers.map((v,i)=><p key={i}>👤 {v.name} — {v.phone} — {v.skill}</p>)}
+   </div>
+  </>;
+ }
+
+ function safetyPage(){
+  let tips=[
+   ["🌊 Flood Safety","Move to higher ground. Avoid walking or driving through floodwater. Switch off electricity if safe."],
+   ["🌍 Earthquake Safety","Drop, Cover, and Hold On. Stay away from windows. After shaking stops, move to a safe open area."],
+   ["🔥 Fire Safety","Raise the alarm, leave the building using safe exits, and never use elevators during a fire."],
+   ["🌀 Cyclone Safety","Stay indoors, secure loose objects, keep emergency supplies ready, and follow official evacuation orders."],
+   ["⛰ Landslide Safety","Move away from slopes and streams when warning signs appear. Follow local evacuation instructions."]
+  ];
+  return <>
+   <h2>Disaster Safety Guidelines</h2>
+   {tips.map(t=><div className="tip" key={t[0]}><h3>{t[0]}</h3><p>{t[1]}</p></div>)}
+  </>;
+ }
+
+ function contactPage(){
+  let contacts=[["National Emergency","112"],["Fire Services","101"],["Ambulance","108"],["Disaster Management","1078"],["Women Helpline","181"],["Child Helpline","1098"]];
+  return <>
+   <h2>Emergency Contacts - India</h2>
+   <div className="grid">
+    {contacts.map(c=><div className="card" key={c[0]}><h3>{c[0]}</h3><h2>{c[1]}</h2><a href={"tel:"+c[1]}><button>Call Now</button></a></div>)}
+   </div>
+  </>;
+ }
+
+ function settingsPage(){
+  return <><h2>Settings</h2><div className="panel"><h3>Account Information</h3><p>Logged in as: {user}</p><button className="danger" onClick={logout}>Logout</button></div></>;
+ }
+
+ let content={
+  "Dashboard":dashboard,
+  "Incident Reports":incidentPage,
+  "Emergency Map":mapPage,
+  "Shelters & Camps":shelterPage,
+  "Relief Resources":resourcePage,
+  "Volunteers":volunteerPage,
+  "Safety Guidelines":safetyPage,
+  "Emergency Contacts":contactPage,
+  "Settings":settingsPage
+ };
+
+ return <div className="layout">
+  <aside className="sidebar">
+   <h2>🛡 SafeHaven</h2>
+   <nav>{menu.map(m=><button key={m} className={page===m?"active":""} onClick={()=>setPage(m)}>{m}</button>)}</nav>
+  </aside>
+  <main className="main">
+   <header className="topbar"><h3>{page}</h3><span>Welcome, {user} 👋</span></header>
+   <section className="content">{content[page]()}</section>
+  </main>
+ </div>;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
